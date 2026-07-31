@@ -1,4 +1,4 @@
-name: Build TraderMind Web App
+name: Build TraderMind Setup.exe
 
 on:
   push:
@@ -7,13 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -23,17 +24,33 @@ jobs:
         with:
           version: 10
 
+      # pnpm-lock.yaml is generated on Linux so Windows-native optional
+      # packages are skipped. We delete it so pnpm resolves fresh on Windows.
+      - name: Remove Linux lockfile
+        run: Remove-Item pnpm-lock.yaml -ErrorAction SilentlyContinue
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build web app (Vite)
-        run: pnpm --filter @workspace/tradermind run build
+      # Step 1: Build the web assets with Electron-friendly base "./"
+      - name: Build web app (vite.electron.config.ts)
+        run: pnpm --filter @workspace/tradermind run electron:build:vite
         env:
           NODE_ENV: production
 
-      - name: Upload build output
+      # Step 2: Compile Electron main process TypeScript → CommonJS
+      - name: Compile Electron main process
+        run: pnpm --filter @workspace/tradermind run electron:compile
+
+      # Step 3: Package into Setup.exe with electron-builder
+      - name: Build Windows installer (Setup.exe)
+        run: pnpm --filter @workspace/tradermind run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Setup.exe
         uses: actions/upload-artifact@v4
         with:
-          name: TraderMind-Web-Build
-          path: artifacts/tradermind/dist/
+          name: TraderMind-Setup-Windows
+          path: artifacts/tradermind/dist-electron/*.exe
           if-no-files-found: error
