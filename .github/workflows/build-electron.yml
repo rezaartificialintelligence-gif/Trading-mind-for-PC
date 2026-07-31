@@ -23,15 +23,15 @@ jobs:
         with:
           version: 10
 
+      # The lockfile is generated on Linux (Replit) so Windows-native optional
+      # packages (rollup-win32, lightningcss-win32, etc.) are all marked as
+      # skipped ('-'). Deleting it forces pnpm to resolve fresh on Windows and
+      # install the correct platform binaries automatically.
+      - name: Delete lockfile so pnpm resolves for Windows
+        run: Remove-Item pnpm-lock.yaml -ErrorAction SilentlyContinue
+
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-
-      # Fix: pnpm on Linux generates a lockfile that skips Windows-native
-      # rollup binaries (@rollup/rollup-win32-x64-msvc). We install it
-      # explicitly so Vite can build on the Windows runner.
-      - name: Install Windows native rollup binary
-        run: pnpm add @rollup/rollup-win32-x64-msvc --ignore-workspace-root-check
-        working-directory: artifacts/tradermind
 
       - name: Build web app (Vite)
         run: pnpm --filter @workspace/tradermind run build
